@@ -1,0 +1,1 @@
+"""Shared utilities (path safety)."""

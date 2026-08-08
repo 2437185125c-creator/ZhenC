@@ -1,0 +1,33 @@
+# Reference material — the OpenHarness project is kept as a study reference,
+# not part of this repo.
+/openharness/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+
+# uv
+.uv/
+
+# Test & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Tooling
+.idea/
+*.iml
+
+# Artifacts / eval outputs
+output/
+artifacts/
+eval-results/
+*.log
