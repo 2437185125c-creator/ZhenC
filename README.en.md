@@ -119,7 +119,7 @@ src/code_review_harness/
 
 ```bash
 uv run pytest        # 134 tests
-uv run crh eval      # offline evaluation (6 planted-bug cases, detection/fix 1.0)
+uv run crh eval      # offline evaluation (6 planted-bug cases, detection/fix 0.7)
 ```
 
 ## Reference

@@ -98,7 +98,7 @@ src/code_review_harness/
 
 ```bash
 uv run pytest        # 134 个测试
-uv run crh eval      # 离线评估（6 类注入 bug，检出率/修复率 1.0）
+uv run crh eval      # 离线评估（6 类注入 bug，检出率/修复率 0.7）
 ```
 
 ## 参考
