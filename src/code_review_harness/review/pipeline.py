@@ -29,7 +29,7 @@ from code_review_harness.tools import default_tool_registry
 
 log = logging.getLogger(__name__)
 
-MAX_JSON_REPAIR_ATTEMPTS = 1
+MAX_JSON_REPAIR_ATTEMPTS = 2
 
 
 class ReviewPipeline:
@@ -52,9 +52,18 @@ class ReviewPipeline:
         self._mode = mode
         self._max_turns = max_turns
         self._on_event = on_event
+        self._tool_call_count = 0
+
+    async def _event_sink(self, name: str, payload: dict) -> None:
+        """Count tool executions and forward every event to the external sink."""
+        if name == "tool_execution_completed":
+            self._tool_call_count += 1
+        if self._on_event is not None:
+            await self._on_event(name, payload)
 
     async def review(self, repo_path: Path | None = None) -> ReviewReport:
         repo = Path(repo_path or self._cwd).resolve()
+        self._tool_call_count = 0
 
         changed_files = await changed_files_from_repo(repo)
         scope = build_scope(repo, changed_files)
@@ -73,12 +82,12 @@ class ReviewPipeline:
                 checker=self._checker,
                 cwd=repo,
                 approval_gate=auto_deny,
-                event_sink=self._on_event,
+                event_sink=self._event_sink,
             ),
             system_prompt=build_review_system_prompt(),
             cwd=repo,
             max_turns=self._max_turns,
-            on_event=self._on_event,
+            on_event=self._event_sink,
         )
 
         user_prompt = build_review_user_prompt(
@@ -88,6 +97,18 @@ class ReviewPipeline:
             changed_file_names=changed_names,
         )
         result = await loop.run(user_prompt)
+
+        # Constraint: when there is an actual change to review, the model MUST
+        # have inspected the code with at least one tool. A report produced
+        # without any tool call is treated as unsupported and the model is told
+        # to go back and actually look before concluding.
+        if changed_names and self._tool_call_count == 0:
+            result = await loop.continue_run(
+                "You produced your report without calling any tool to inspect "
+                "the change. This is not acceptable — call git_diff (and read_file "
+                "on the changed files) first, then output the JSON report."
+            )
+
         payload, error = await self._extract_with_repair(loop, result.final_text)
         if error is not None:
             raise ReviewOutputError(

@@ -84,3 +84,24 @@ def test_syntax_error_produces_critical_finding():
 def test_file_path_stamped():
     findings = analyze_source("except:\n    pass\n", "src/x.py")
     assert all(f.file_path == "src/x.py" for f in findings)
+
+
+# --- regression tests: findings reported by real repos (agentdesk) ---
+
+
+def test_future_import_not_reported_as_unused():
+    # `from __future__ import annotations` is a compiler directive.
+    ids = rule_ids("from __future__ import annotations\nx = 1\n")
+    assert "PY-UNUSED-IMPORT" not in ids
+
+
+def test_except_as_name_is_defined():
+    # `except ... as e:` binds `e` inside the handler.
+    ids = rule_ids("try:\n    pass\nexcept ValueError as e:\n    print(e)\n")
+    assert "PY-UNDEFINED-NAME" not in ids
+
+
+def test_is_none_is_acceptable():
+    # `x is None` is idiomatic; only literal values are a problem.
+    ids = rule_ids("if result is None:\n    pass\n")
+    assert "PY-IS-LITERAL" not in ids

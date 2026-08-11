@@ -95,6 +95,12 @@ class _DefinedNameVisitor(ast.NodeVisitor):
                         self._add(name.id)
         self.generic_visit(node)
 
+    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+        # `except SomeError as exc:` binds `exc` in the handler body.
+        if node.name:
+            self._add(node.name)
+        self.generic_visit(node)
+
 
 class _UseVisitor(ast.NodeVisitor):
     """Collect every loaded name (Name with ctx=Load)."""
@@ -122,6 +128,10 @@ class _ImportTracker(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        # `from __future__ import ...` is a compiler directive, not a name
+        # binding — never report it as unused.
+        if node.module == "__future__":
+            return
         for alias in node.names:
             bound = alias.asname or alias.name
             self.imports[bound] = (node.lineno, f"from {node.module} import {alias.name}")
@@ -258,7 +268,11 @@ def _check_is_literal(tree: ast.AST) -> list[Finding]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Compare):
             for op, right in zip(node.ops, node.comparators):
+                # `x is None` is idiomatic and correct — only flag literal
+                # comparisons that are usually a mistake (`is True/False/1/...`).
                 if isinstance(op, ast.Is) and isinstance(right, ast.Constant):
+                    if right.value is None:
+                        continue
                     findings.append(
                         Finding(
                             rule_id="PY-IS-LITERAL",

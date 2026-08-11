@@ -64,6 +64,7 @@ async def test_pipeline_produces_report_with_static_and_model_findings(tmp_git_r
 async def test_pipeline_repairs_invalid_json_once(tmp_git_repo):
     add_bug(tmp_git_repo)
     responses = [
+        LLMResponse(text="reading", tool_uses=(ToolUse(id="c0", name="read_file", input={"path": "app.py"}),)),
         LLMResponse(text="this is not json at all"),
         LLMResponse(text=review_json()),
     ]
@@ -71,15 +72,18 @@ async def test_pipeline_repairs_invalid_json_once(tmp_git_repo):
 
     assert any(f.rule_id == "REVIEW-001" for f in report.findings)
     # The repair is a second user message in the same conversation.
-    assert len(provider.requests) == 2
-    assert provider.requests[1].messages[-1].is_tool_response is False
+    assert len(provider.requests) == 3
+    assert provider.requests[2].messages[-1].is_tool_response is False
 
 
 @pytest.mark.asyncio
 async def test_pipeline_raises_when_json_never_validates(tmp_git_repo):
     add_bug(tmp_git_repo)
+    # One tool call (to satisfy the inspect-first constraint) then all invalid.
     responses = [
+        LLMResponse(text="reading", tool_uses=(ToolUse(id="c0", name="read_file", input={"path": "app.py"}),)),
         LLMResponse(text="not json"),
+        LLMResponse(text="still not json"),
         LLMResponse(text="still not json"),
     ]
     with pytest.raises(ReviewOutputError):
@@ -93,3 +97,23 @@ async def test_pipeline_empty_diff_is_ok(tmp_git_repo):
     report, _ = await run_pipeline(tmp_git_repo, responses)
     assert report.count == 0
     assert any("static analysis" in n for n in report.notes)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_forces_tool_inspection_before_report(tmp_git_repo):
+    add_bug(tmp_git_repo)
+    # The model reports directly without inspecting -> the pipeline must demand
+    # a tool call, and only accept the report after the model inspects.
+    responses = [
+        LLMResponse(text=review_json()),  # premature report, no tools used
+        LLMResponse(text="reading", tool_uses=(ToolUse(id="c0", name="read_file", input={"path": "app.py"}),)),
+        LLMResponse(text=review_json()),  # report after inspection
+    ]
+    provider = MockProvider(responses)
+    pipeline = ReviewPipeline(provider=provider, cwd=tmp_git_repo)
+    report = await pipeline.review()
+
+    assert any(f.rule_id == "REVIEW-001" for f in report.findings)
+    # The second request carries the "inspect first" constraint message.
+    constraint = provider.requests[1].messages[-1]
+    assert "without calling any tool" in constraint.text

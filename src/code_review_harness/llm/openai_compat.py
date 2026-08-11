@@ -16,6 +16,13 @@ import httpx
 
 from code_review_harness.harness.messages import Message, ToolUse
 from code_review_harness.llm.base import LLMProvider, LLMRequest, LLMResponse
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
+API_KEY= os.getenv("API_KEY")
+
 
 log = logging.getLogger(__name__)
 
@@ -77,9 +84,9 @@ class OpenAICompatProvider(LLMProvider):
     def __init__(
         self,
         *,
-        api_key: str,
-        base_url: str = "https://api.openai.com/v1",
-        model: str = "gpt-4o-mini",
+        api_key: str = API_KEY,
+        base_url: str = "https://api.deepseek.com",
+        model: str = "deepseek-v4-flash",
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self._api_key = api_key

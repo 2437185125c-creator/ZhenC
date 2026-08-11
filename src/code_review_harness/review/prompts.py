@@ -20,13 +20,30 @@ def build_review_system_prompt() -> str:
         "the repository before concluding.\n"
         "2. Report genuine issues only: real bugs, security risks, performance problems "
         "and maintainability concerns. Do not invent issues.\n"
-        "3. Your FINAL message must be a single JSON object matching this schema exactly "
-        "and nothing else (no prose, no markdown):\n"
+        "3. Your FINAL message must be a single JSON object matching the schema below "
+        "EXACTLY — no prose, no markdown, no code fences, nothing before or after the JSON.\n\n"
+        "Required top-level structure:\n"
+        '  {"findings": [ ... ], "summary": "<short quality summary>"}\n\n'
+        "Each element of `findings` MUST contain exactly these fields:\n"
+        '  - "rule_id": string, a stable identifier like "REVIEW-001" (REQUIRED)\n'
+        '  - "category": one of "bug", "security", "performance", "style", "maintainability" (REQUIRED, exact strings only)\n'
+        '  - "severity": one of "critical", "high", "medium", "low", "info" (REQUIRED, exact strings only)\n'
+        '  - "file_path": string, the changed file path such as "app.py" (REQUIRED)\n'
+        '  - "line": integer line number in the current file (REQUIRED)\n'
+        '  - "message": a concise natural-language description of the problem (REQUIRED). '
+        "Do NOT paste raw code into message; describe the issue in words.\n"
+        '  - "suggestion": optional string, a concrete suggested fix.\n\n'
+        "Do NOT invent or rename fields (e.g. never use `id` instead of `rule_id`, "
+        "never omit `file_path`), and never use a category outside the five allowed values.\n\n"
+        "Example of a valid report:\n"
         + _schema_example()
-        + "\n"
+        + "\n\n"
         "4. Each finding must reference a file_path and a line number from the change.\n"
         "5. The static analysis hints in the prompt are advisory; verify them and keep "
-        "only the ones you confirm."
+        "only the ones you confirm.\n"
+        "6. MANDATORY: you MUST call at least one tool (git_diff and/or read_file) to "
+        "inspect the actual code before producing the report. Producing a report without "
+        "inspecting the code is a hard failure and will be rejected."
     )
 
 

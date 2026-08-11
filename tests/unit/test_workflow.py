@@ -32,6 +32,9 @@ REVIEW_JSON = json.dumps(
     }
 )
 
+# The review pipeline now requires at least one tool call before a report.
+INSPECT = LLMResponse(text="inspecting", tool_uses=(ToolUse(id="c0", name="read_file", input={"path": "app.py"}),))
+
 
 @pytest.fixture
 def buggy_repo(tmp_git_repo: Path) -> Path:
@@ -57,6 +60,7 @@ def write_fix(use_id: str, content: str) -> LLMResponse:
 @pytest.mark.asyncio
 async def test_workflow_full_cycle_with_fix(buggy_repo):
     responses = [
+        INSPECT,
         LLMResponse(text=REVIEW_JSON),
         write_fix("c1", FIXED),
         LLMResponse(
@@ -94,7 +98,7 @@ async def test_workflow_full_cycle_with_fix(buggy_repo):
 
 @pytest.mark.asyncio
 async def test_workflow_plan_rejected_stops_before_fix(buggy_repo):
-    responses = [LLMResponse(text=REVIEW_JSON)]
+    responses = [INSPECT, LLMResponse(text=REVIEW_JSON)]
     provider = MockProvider(responses)
     workflow = ReviewWorkflow(
         provider=provider,
@@ -117,6 +121,7 @@ async def test_workflow_plan_rejected_stops_before_fix(buggy_repo):
 @pytest.mark.asyncio
 async def test_workflow_no_findings_skips_fix(buggy_repo):
     responses = [
+        INSPECT,
         LLMResponse(text=json.dumps({"findings": [], "summary": "clean"})),
     ]
     provider = MockProvider(responses)

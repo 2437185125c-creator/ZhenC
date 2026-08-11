@@ -63,11 +63,23 @@ def parse_review_payload(text: str) -> ReviewPayload:
     try:
         data: Any = json.loads(stripped)
     except json.JSONDecodeError as exc:
-        raise ReviewOutputError(f"output is not valid JSON: {exc}") from exc
+        raise ReviewOutputError(
+            f"output is not valid JSON: {exc}\n(model output preview: {_preview(text)})"
+        ) from exc
     try:
         return ReviewPayload.model_validate(data)
     except ValidationError as exc:
-        raise ReviewOutputError(f"output failed schema validation: {exc}") from exc
+        raise ReviewOutputError(
+            f"output failed schema validation: {exc}\n(model output preview: {_preview(text)})"
+        ) from exc
+
+
+def _preview(text: str, limit: int = 300) -> str:
+    """A safe one-line preview of the model output for error messages."""
+    single = " ".join(text.split())
+    if not single:
+        return "<empty>"
+    return single[:limit] + ("..." if len(single) > limit else "")
 
 
 def payload_to_report(payload: ReviewPayload, repo_path: str) -> ReviewReport:

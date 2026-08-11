@@ -47,13 +47,29 @@ def test_cli_review_static_json(tmp_path, capsys):
     assert data["repo_path"] == str(repo.resolve())
 
 
-def test_cli_review_requires_api_key_without_static(tmp_path, capsys):
+def test_cli_review_requires_api_key_without_static(tmp_path, capsys, monkeypatch):
     repo = tmp_path / "repo"
     repo.mkdir()
+    make_buggy_repo(repo)
+    # Isolate from any real .env / env var on the developer machine.
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    import dotenv
+
+    monkeypatch.setattr(dotenv, "load_dotenv", lambda *a, **k: False)
     code = main(["review", "--repo", str(repo), "--provider", "openai", "--json"])
     captured = capsys.readouterr()
     assert code != 0
     assert "No API key" in captured.err or "No API key" in captured.out
+
+
+def test_cli_review_fails_loudly_on_non_git_dir(tmp_path, capsys):
+    repo = tmp_path / "not_a_repo"
+    repo.mkdir()
+    code = main(["review", "--repo", str(repo), "--static"])
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "not a git repository" in captured.err
 
 
 def test_cli_eval(tmp_path, capsys):

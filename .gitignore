@@ -14,6 +14,11 @@ dist/
 .venv/
 venv/
 
+# Secrets
+.env
+.env.*
+!.env.example
+
 # uv
 .uv/
 
